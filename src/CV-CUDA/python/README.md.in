@@ -1,0 +1,78 @@
+[//]: # "SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+[//]: # "SPDX-License-Identifier: Apache-2.0"
+
+# CV-CUDA Python Package
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![CUDA](https://img.shields.io/badge/CUDA-${CUDA_VERSION_MAJOR}-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![Python](https://img.shields.io/badge/python-3.9--3.14-blue)](https://www.python.org/)
+![Platform](https://img.shields.io/badge/Platform-Linux%20x86__64%20%7C%20Linux%20aarch64%20%7C%20WSL2-blue)
+
+CV-CUDA is an open-source library of GPU-accelerated computer vision algorithms designed for speed and scalability.
+It delivers high-throughput, low-latency image/video processing for AI pipelines across NVIDIA cloud, desktop, and edge platforms.
+CV-CUDA is built for performance and works seamlessly with C/C++ and Python frameworks.
+
+For more information on available operators, API documentation, and getting started guides, refer to our [online documentation][CV-CUDA Documentation].
+
+## Installation
+
+```bash
+pip install cvcuda-cu${CUDA_VERSION_MAJOR}
+```
+
+## CV-CUDA in action
+
+Fully GPU-accelerated image resizing with [nvImageCodec](https://docs.nvidia.com/cuda/nvimagecodec/index.html) and CV-CUDA.
+
+```python
+import cvcuda
+from nvidia import nvimgcodec
+
+# Decode image directly to GPU
+decoder = nvimgcodec.Decoder()
+image = decoder.read("input.jpg")
+
+# Convert to CV-CUDA tensor and process
+cvcuda_tensor = cvcuda.as_tensor(image, "HWC")
+resized = cvcuda.resize(cvcuda_tensor, (224, 224, 3), cvcuda.Interp.LINEAR)
+```
+
+## Documentation
+
+- [Official Documentation](https://cvcuda.github.io)
+- [Samples](https://cvcuda.github.io/samples)
+
+## Requirements
+
+- CUDA Toolkit ${CUDA_VERSION_MAJOR} or later
+- Python 3.9 or later
+- NumPy 1.23.5 or later
+- Linux x86_64 (Ubuntu 20.04, 22.04, or later)
+
+## License
+
+CV-CUDA is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
+## Support
+
+- [GitHub Issues](https://github.com/CVCUDA/CV-CUDA/issues)
+- [GitHub Discussions](https://github.com/CVCUDA/CV-CUDA/discussions)
+
+## Citation
+
+If you use CV-CUDA in your research, please cite:
+
+```bibtex
+@software{cvcuda,
+  title = {CV-CUDA},
+  author = {NVIDIA Corporation},
+  year = {2023},
+  url = {https://github.com/CVCUDA/CV-CUDA}
+}
+```
+
+---
+
+**Note**: This is version ${CMAKE_PROJECT_VERSION}${PROJECT_VERSION_SUFFIX} for CUDA ${CUDA_VERSION_MAJOR}.
+
+[CV-CUDA Documentation]: https://cvcuda.github.io

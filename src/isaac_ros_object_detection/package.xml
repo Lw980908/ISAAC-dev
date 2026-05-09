@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>object_detection</name>
+  <version>1.0.0</version>
+  <description>Object detection package with TensorRT and ROS 2 integration</description>
+  <maintainer email="your@email.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  
+  <!-- ROS2 核心依赖 -->
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>  <!-- 组件注册必需 -->
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>livox_ros_driver2</depend>
+  <depend>cv_bridge</depend>
+  <depend>vision_opencv</depend>  <!-- 正确的 OpenCV 依赖名 -->
+  
+  <!-- NITROS 依赖（用于与 H264 编码器配合的协商话题格式）-->
+  <depend>isaac_ros_nitros</depend>
+  <depend>isaac_ros_nitros_image_type</depend>
+  <depend>isaac_ros_managed_nitros</depend>
+  <depend>vpi</depend>
+  
+  <!-- 系统库依赖（通过 CMake 处理，package.xml 中不声明） -->
+  <!-- ❌ 移除以下所有系统库依赖 -->
+  <!-- <depend>opencv</depend> -->
+  <!-- <depend>paho-mqtt-cpp</depend> -->
+  <!-- <depend>nlohmann-json</depend> -->
+  <!-- <depend>libboost-filesystem-dev</depend> -->
+  <!-- <depend>libboost-system-dev</depend> -->
+  <!-- <depend>libcuda1</depend> -->
+  <!-- <depend>libcudnn8</depend> -->
+  <!-- <depend>libcublas11</depend> -->
+  <!-- <depend>libtensorrt8</depend> -->
+  
+  <!-- 必须添加的 export 标签 -->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

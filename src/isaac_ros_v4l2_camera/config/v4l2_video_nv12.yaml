@@ -1,0 +1,37 @@
+# MP4 多视频发布（NITROS NV12）
+#
+# 数据流：
+#   Mp4Nv12NitrosPublisherNode -> /<namespace>/image_raw (NitrosImage NV12)
+#
+# 注意：
+# - 必须显式配置 width/height（下游协商与编码/感知常用固定分辨率）
+
+videos:
+  - name: "mp4_nv12_left"
+    namespace: "left"
+    file_path: "/path/to/left.mp4"
+    loop: true
+    gpu_id: 0
+    width: 1920
+    height: 1536
+    publish_fps: 30.0
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+    camera_link_frame_name: "left_camera"
+    optical_frame_name: "left_camera_optical"
+    camera_info_url: ""
+
+  - name: "mp4_nv12_right"
+    namespace: "right"
+    file_path: "/path/to/right.mp4"
+    loop: true
+    gpu_id: 0
+    width: 1920
+    height: 1536
+    publish_fps: 30.0
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+    camera_link_frame_name: "right_camera"
+    optical_frame_name: "right_camera_optical"
+    camera_info_url: ""
+

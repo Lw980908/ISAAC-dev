@@ -1,0 +1,70 @@
+cuda_curr_min: &cuda_prev_min '12.0'
+cuda_curr_max: &cuda_prev_max '12.9'
+cuda_curr_max: &cuda_curr_max '13.0'
+
+# The version of the devcontainer images to use from https://hub.docker.com/r/rapidsai/devcontainers
+devcontainer_version: '25.12'
+
+# gcc compiler configurations
+gcc7: &gcc7 { name: 'gcc', version: '7', exe: 'g++' }
+gcc8: &gcc8 { name: 'gcc', version: '8', exe: 'g++' }
+gcc9: &gcc9 { name: 'gcc', version: '9', exe: 'g++' }
+gcc10: &gcc10 { name: 'gcc', version: '10', exe: 'g++' }
+gcc11: &gcc11 { name: 'gcc', version: '11', exe: 'g++' }
+gcc12: &gcc12 { name: 'gcc', version: '12', exe: 'g++' }
+gcc13: &gcc13 { name: 'gcc', version: '13', exe: 'g++' }
+gcc14: &gcc14 { name: 'gcc', version: '14', exe: 'g++' }
+
+# LLVM Compiler configurations
+llvm14: &llvm14 { name: 'llvm', version: '14', exe: 'clang++' }
+llvm15: &llvm15 { name: 'llvm', version: '15', exe: 'clang++' }
+llvm16: &llvm16 { name: 'llvm', version: '16', exe: 'clang++' }
+llvm17: &llvm17 { name: 'llvm', version: '17', exe: 'clang++' }
+llvm18: &llvm18 { name: 'llvm', version: '18', exe: 'clang++' }
+llvm19: &llvm19 { name: 'llvm', version: '19', exe: 'clang++' }
+llvm20: &llvm20 { name: 'llvm', version: '20', exe: 'clang++' }
+
+# Each environment below will generate a unique build/test job
+# See the "compute-matrix" job in the workflow for how this is parsed and used
+# cuda: The CUDA Toolkit version
+# os: The operating system used
+# cpu: The CPU architecture
+# compiler: The compiler to use
+#   name: The compiler name
+#   version: The compiler version
+#   exe: The unverionsed compiler binary name
+
+# Configurations that will run for every PR
+pull_request:
+  nvcc:
+    - {cuda: *cuda_prev_min, compiler: *gcc7,   cpu: 'amd64'}
+    - {cuda: *cuda_prev_min, compiler: *gcc8,   cpu: 'amd64'}
+    - {cuda: *cuda_prev_min, compiler: *gcc9,   cpu: 'amd64'}
+    - {cuda: *cuda_prev_min, compiler: *gcc10,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_min, compiler: *gcc11,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_min, compiler: *gcc12,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_min, compiler: *llvm14, cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc7,   cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc8,   cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc9,   cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc10,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc11,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc12,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc13,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *gcc14,  cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *llvm14, cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *llvm15, cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *llvm16, cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *llvm17, cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *llvm18, cpu: 'amd64'}
+    - {cuda: *cuda_prev_max, compiler: *llvm19, cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *gcc11,  cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *gcc12,  cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *gcc13,  cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *gcc14,  cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *llvm15, cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *llvm16, cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *llvm17, cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *llvm18, cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *llvm19, cpu: 'amd64'}
+    - {cuda: *cuda_curr_max, compiler: *llvm20, cpu: 'amd64'}

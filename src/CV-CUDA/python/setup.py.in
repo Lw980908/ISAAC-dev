@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the 'License');
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an 'AS IS' BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Setup script for CV-CUDA Python package.
+
+IMPORTANT: pyproject.toml is the authoritative source for package metadata (PEP 621).
+This setup.py provides:
+  1. Backward compatibility with legacy build tools (setup.py bdist_wheel)
+  2. Custom build logic that cannot be expressed in TOML (NoBuildExtension)
+
+For modern builds, prefer: python -m build (reads pyproject.toml)
+For legacy builds: python setup.py bdist_wheel (uses this file)
+"""
+
+from pathlib import Path
+from setuptools import setup, find_packages, Extension
+from setuptools.command.build_ext import build_ext
+
+
+class NoBuildExtension(build_ext):
+    """Prevent setuptools from building (CMake handles it)."""
+    def run(self):
+        pass
+
+
+# Read README (shared with pyproject.toml)
+readme = Path(__file__).parent / 'README.md'
+long_desc = readme.read_text(encoding='utf-8') if readme.exists() else '${CMAKE_PROJECT_DESCRIPTION}'
+
+# Minimal metadata - detailed classifiers and project URLs are in pyproject.toml only
+setup(
+    name='cvcuda-cu${CUDA_VERSION_MAJOR}',
+    version='${CMAKE_PROJECT_VERSION}${PROJECT_VERSION_SUFFIX}',
+    description='${CMAKE_PROJECT_DESCRIPTION}',
+    long_description=long_desc,
+    long_description_content_type='text/markdown',
+    author='NVIDIA Corporation',
+    author_email='support@nvidia.com',
+    url='https://cvcuda.github.io',
+    license='Apache-2.0',
+    packages=find_packages(include=["cvcuda"]),
+    package_data={
+        'cvcuda': ['*.so'],
+        'cvcuda_cu${CUDA_VERSION_MAJOR}.libs': ['*.*'],
+    },
+    include_package_data=True,
+    python_requires='>=3.9, <3.15',
+    install_requires=['numpy>=1.23.5'],
+    cmdclass={'build_ext': NoBuildExtension},
+    ext_modules=[Extension(name='_unused', sources=[])],
+    # Classifiers, project URLs, and other metadata in pyproject.toml
+)

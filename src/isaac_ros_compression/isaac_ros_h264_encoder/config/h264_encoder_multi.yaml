@@ -1,0 +1,53 @@
+encoders:
+  - name: "h264_encoder_left"
+    namespace: "left"
+    input_width: 1920
+    input_height: 1536
+    # 输入协商优先格式（不限制协商范围，可兼容 nv12/bgr8）
+    # compatible_input_format: "nitros_image_nv12"  # 或 "nitros_image_bgr8"
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "pframe_cqp"
+
+  - name: "h264_encoder_right"
+    namespace: "right"
+    input_width: 1920
+    input_height: 1536
+    # compatible_input_format: "nitros_image_nv12"
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "pframe_cqp"
+
+  - name: "h264_encoder_front"
+    namespace: "front"
+    input_width: 1920
+    input_height: 1536
+    # compatible_input_format: "nitros_image_nv12"
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "pframe_cqp"
+
+  - name: "h264_encoder_back"
+    namespace: "back"
+    input_width: 1920
+    input_height: 1536
+    # compatible_input_format: "nitros_image_nv12"
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "pframe_cqp"

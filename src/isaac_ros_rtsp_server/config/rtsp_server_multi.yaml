@@ -1,0 +1,41 @@
+# 多端口方案：每路独立端口，独立事件循环线程
+streams:
+  - name: "rtsp_left"
+    namespace: "left"
+    stream_name: "left"
+    port: 8554          # 独立端口
+    video_type: "h264"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+
+  - name: "rtsp_right"
+    namespace: "right"
+    stream_name: "right"
+    port: 8555          # 独立端口
+    video_type: "h264"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+
+  - name: "rtsp_front"
+    namespace: "front"
+    stream_name: "front"
+    port: 8556          # 独立端口
+    video_type: "h264"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+
+  - name: "rtsp_back"
+    namespace: "back"
+    stream_name: "back"
+    port: 8557          # 独立端口
+    video_type: "h264"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"

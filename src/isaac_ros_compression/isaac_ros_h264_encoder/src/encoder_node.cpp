@@ -1,0 +1,178 @@
+// SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+// Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+#include "isaac_ros_h264_encoder/encoder_node.hpp"
+
+#include <cstdio>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "isaac_ros_nitros_compressed_image_type/nitros_compressed_image.hpp"
+#include "isaac_ros_nitros_image_type/nitros_image.hpp"
+
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_components/register_node_macro.hpp"
+
+namespace nvidia {
+namespace isaac_ros {
+namespace h264_encoder {
+
+using nvidia::gxf::optimizer::GraphIOGroupSupportedDataTypesInfoList;
+
+// 接收上游图像的 ingress receiver（支持多格式协商）
+constexpr char INPUT_COMPONENT_KEY[] = "color_converter/data_receiver";
+constexpr char INPUT_DEFAULT_FORMAT[] = "nitros_image_nv12";
+constexpr char INPUT_TOPIC_NAME[] = "image_raw";
+
+constexpr char OUTPUT_COMPONENT_KEY[] = "sink/sink";
+constexpr char OUTPUT_DEFAULT_FORMAT[] = "nitros_compressed_image";
+constexpr char OUTPUT_TOPIC_NAME[] = "image_compressed";
+
+constexpr char APP_YAML_FILENAME[] = "config/nitros_encoder_node.yaml";
+constexpr char PACKAGE_NAME[] = "isaac_ros_h264_encoder";
+
+const std::vector<std::pair<std::string, std::string>> EXTENSIONS = {
+    {"isaac_ros_gxf", "gxf/lib/std/libgxf_std.so"},
+    {"isaac_ros_gxf", "gxf/lib/multimedia/libgxf_multimedia.so"},
+    {"isaac_ros_gxf", "gxf/lib/cuda/libgxf_cuda.so"},
+    {"isaac_ros_gxf", "gxf/lib/serialization/libgxf_serialization.so"},
+    {"gxf_isaac_tensorops", "gxf/lib/libgxf_isaac_tensorops.so"},
+    {"isaac_ros_h264_encoder",
+     "gxf/lib/codec/libgxf_video_encoder_extension.so"},
+};
+const std::vector<std::string> PRESET_EXTENSION_SPEC_NAMES = {
+    "isaac_ros_h264_encoder",
+};
+const std::vector<std::string> EXTENSION_SPEC_FILENAMES = {};
+const std::vector<std::string> GENERATOR_RULE_FILENAMES = {
+    "config/namespace_injector_rule.yaml"};
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+const nitros::NitrosPublisherSubscriberConfigMap CONFIG_MAP = {
+    {INPUT_COMPONENT_KEY,
+     {
+         .type = nitros::NitrosPublisherSubscriberType::NEGOTIATED,
+         .qos = rclcpp::QoS(10),
+         .compatible_data_format = INPUT_DEFAULT_FORMAT,
+         .topic_name = INPUT_TOPIC_NAME,
+     }},
+    {OUTPUT_COMPONENT_KEY,
+     {.type = nitros::NitrosPublisherSubscriberType::NEGOTIATED,
+      .qos = rclcpp::QoS(10),
+      .compatible_data_format = OUTPUT_DEFAULT_FORMAT,
+      .topic_name = OUTPUT_TOPIC_NAME,
+      .frame_id_source_key = INPUT_COMPONENT_KEY}}};
+#pragma GCC diagnostic pop
+
+EncoderNode::EncoderNode(const rclcpp::NodeOptions &options)
+    : nitros::NitrosNode(options, APP_YAML_FILENAME, CONFIG_MAP,
+                         PRESET_EXTENSION_SPEC_NAMES, EXTENSION_SPEC_FILENAMES,
+                         GENERATOR_RULE_FILENAMES, EXTENSIONS, PACKAGE_NAME),
+      codec_(declare_parameter<int32_t>("codec", 0)),
+      input_width_(declare_parameter<int32_t>("input_width", 1920)),
+      input_height_(declare_parameter<int32_t>("input_height", 1200)),
+      qp_(declare_parameter<int32_t>("qp", 20)),
+      rate_control_mode_(declare_parameter<int32_t>("rate_control_mode", 2)),
+      bitrate_(declare_parameter<int32_t>("bitrate", 12000000)),
+      framerate_(declare_parameter<int32_t>("framerate", 30)),
+      hw_preset_type_(declare_parameter<int32_t>("hw_preset_type", 0)),
+      profile_(declare_parameter<int32_t>("profile", 0)),
+      iframe_interval_(declare_parameter<int32_t>("iframe_interval", 5)),
+      config_(declare_parameter<std::string>("config", "pframe_cqp")) {
+  RCLCPP_DEBUG(get_logger(), "[EncoderNode] Constructor");
+
+  // 兼容输入：支持 nv12 / bgr8 等多种 NITROS 图像格式协商。
+  // 该参数仅用于设置“优先/兼容格式”（compatible_data_format），不限制协商范围。
+  const std::string compatible_input_format = declare_parameter<std::string>(
+      "compatible_input_format", INPUT_DEFAULT_FORMAT);
+  if (!compatible_input_format.empty()) {
+    config_map_[INPUT_COMPONENT_KEY].compatible_data_format =
+        compatible_input_format;
+  }
+
+  registerSupportedType<nvidia::isaac_ros::nitros::NitrosImage>();
+  registerSupportedType<nvidia::isaac_ros::nitros::NitrosCompressedImage>();
+
+  startNitrosNode();
+}
+
+void EncoderNode::preLoadGraphCallback() {
+  NitrosNode::preLoadGraphSetParameter(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "config", config_);
+
+  RCLCPP_INFO(get_logger(), "[EncoderNode] preLoadGraphCallback().");
+}
+
+void EncoderNode::postLoadGraphCallback() {
+  RCLCPP_INFO(get_logger(), "[EncoderNode] postLoadGraphCallback().");
+
+  // Update encoder parameters
+  getNitrosContext().setParameterInt32(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "codec", codec_);
+  getNitrosContext().setParameterUInt32("encoder",
+                                        "nvidia::gxf::VideoEncoderRequest",
+                                        "input_width", (uint32_t)input_width_);
+
+  getNitrosContext().setParameterUInt32(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "input_height",
+      (uint32_t)input_height_);
+
+  // 颜色转换输出为 NV12，需要为输出 VideoBuffer 分配池内存。
+  // NV12 紧凑大小：w*h*3/2
+  const uint64_t nv12_frame_bytes =
+      (static_cast<uint64_t>(input_width_) *
+       static_cast<uint64_t>(input_height_) * 3ULL) /
+      2ULL;
+  getNitrosContext().setParameterUInt64("color_converter",
+                                        "nvidia::gxf::BlockMemoryPool",
+                                        "block_size", nv12_frame_bytes);
+
+  getNitrosContext().setParameterUInt32(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "qp", (uint32_t)qp_);
+
+  getNitrosContext().setParameterInt32("encoder",
+                                       "nvidia::gxf::VideoEncoderRequest",
+                                       "rate_control_mode", rate_control_mode_);
+
+  getNitrosContext().setParameterInt32(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "bitrate", bitrate_);
+
+  getNitrosContext().setParameterInt32(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "framerate", framerate_);
+
+  getNitrosContext().setParameterInt32(
+      "encoder", "nvidia::gxf::VideoEncoderRequest", "hw_preset_type",
+      (uint32_t)hw_preset_type_);
+
+  getNitrosContext().setParameterInt32("encoder",
+                                       "nvidia::gxf::VideoEncoderRequest",
+                                       "profile", (uint32_t)profile_);
+
+  getNitrosContext().setParameterInt32("encoder",
+                                       "nvidia::gxf::VideoEncoderRequest",
+                                       "iframe_interval", iframe_interval_);
+}
+
+EncoderNode::~EncoderNode() {}
+
+} // namespace h264_encoder
+} // namespace isaac_ros
+} // namespace nvidia
+
+RCLCPP_COMPONENTS_REGISTER_NODE(nvidia::isaac_ros::h264_encoder::EncoderNode)
+

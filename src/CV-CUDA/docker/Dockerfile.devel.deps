@@ -1,0 +1,256 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASE=nvidia/cuda:12.5.0-devel-ubuntu22.04
+FROM ${BASE:-nvidia/cuda:12.5.0-devel-ubuntu22.04}
+
+ARG VER_CUDA=12.9.0
+ARG VER_NUMPY_MAJOR=2
+ARG VER_TORCH=2.8.0
+ARG TORCH_ADDITIONAL_INDEX_URL=""
+
+ARG PYTHON_VERSIONS="3.9 3.10 3.11 3.12 3.13 3.14"
+ARG CMAKE_VERSION=3.24.3
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Set environment variables to help with QEMU emulation issues
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install basic packages first (needed for add-apt-repository)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        lsb-release \
+        ca-certificates \
+        gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# add apt-fast
+RUN add-apt-repository -y ppa:apt-fast/stable && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends apt-fast && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Install system packages in smaller chunks to avoid QEMU issues
+RUN apt-fast update && apt-fast install -y --no-install-recommends \
+        build-essential \
+        wget \
+        curl \
+        git \
+        git-lfs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GCC packages - one version per RUN command for better isolation and caching
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends gcc-10 g++-10 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends gcc-11 g++-11 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends gcc-12 g++-12 \
+    && rm -rf /var/lib/apt/lists/*
+
+# need to add ppa for gcc-13 and gcc-14
+RUN add-apt-repository ppa:ubuntu-toolchain-r/ppa -y && \
+    add-apt-repository ppa:ubuntu-toolchain-r/test -y
+
+
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends gcc-13 g++-13 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GCC-14 only for Ubuntu 24.04
+RUN UBUNTU_VERSION=$(lsb_release -rs) && \
+    if [ "$UBUNTU_VERSION" = "24.04" ]; then \
+        apt-fast update && \
+        apt-fast install -y --no-install-recommends gcc-14 g++-14 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# remove ppa for gcc-13 and gcc-14
+RUN add-apt-repository --remove ppa:ubuntu-toolchain-r/ppa && \
+    add-apt-repository --remove ppa:ubuntu-toolchain-r/test
+
+# Install clang-11 only for Ubuntu 22.04 or lower
+RUN UBUNTU_VERSION=$(lsb_release -rs) && \
+    UBUNTU_MAJOR=$(echo "$UBUNTU_VERSION" | cut -d. -f1) && \
+    if [ "$UBUNTU_MAJOR" -le 22 ]; then \
+        apt-fast update && \
+        apt-fast install -y --no-install-recommends clang-11 libclang-11-dev\
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Install development tools
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends \
+        clang-14 libclang-14-dev \
+        ninja-build \
+        libgtest-dev \
+        libgmock-dev \
+        ccache \
+        libssl-dev \
+        doxygen \
+        graphviz \
+        fonts-dejavu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build and install zlib 1.3.1 from source to replace vulnerable system version (CVE-2018-25032)
+# Remove any old system zlib artifacts and install new version to /usr/local
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -L https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz -o /tmp/zlib-1.3.1.tar.gz \
+    && tar -xzf /tmp/zlib-1.3.1.tar.gz -C /tmp \
+    && cd /tmp/zlib-1.3.1 \
+    && ./configure --prefix=/usr/local \
+    && make -j$(nproc) \
+    && rm -f /usr/lib/*/libz.* /lib/*/libz.* \
+    && make install \
+    && rm -rf /tmp/zlib-1.3.1* \
+    && ldconfig
+
+# Install Node.js and related tools
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends \
+        nodejs \
+        npm \
+        pre-commit \
+        shellcheck \
+    && rm -rf /var/lib/apt/lists/*
+
+# NOTE: we use minimal Debian/Ubuntu-based python packages and handle most dependencies with pip
+
+# Install system default Python packages first
+RUN apt-fast update && \
+    apt-fast install -y --no-install-recommends \
+        python3 python3-dev python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# add deadsnakes ppa for python versions
+RUN add-apt-repository ppa:deadsnakes/ppa -y
+
+# Install all specified Python versions with dev and venv packages
+RUN set -e; \
+    apt-fast update && \
+    for pyver in $PYTHON_VERSIONS; do \
+        echo "Installing Python $pyver with dev and venv packages" && \
+        apt-fast install -y --no-install-recommends \
+            python$pyver python$pyver-dev python$pyver-venv; \
+    done && \
+    rm -rf /var/lib/apt/lists/*
+
+# Determine architecture for CMake download
+RUN dpkg_arch=$(dpkg --print-architecture) && \
+    case "${dpkg_arch}" in \
+        amd64) cmake_arch="x86_64";; \
+        arm64) cmake_arch="aarch64";; \
+        *) echo >&2 "error: unsupported architecture ('${dpkg_arch}')" && exit 1;; \
+    esac && \
+    CMAKE_VERSION_SHORT=$(echo ${CMAKE_VERSION} | cut -d. -f1,2) && \
+    echo "Downloading CMake for ${cmake_arch}" && \
+    curl --fail -L https://cmake.org/files/v${CMAKE_VERSION_SHORT}/cmake-${CMAKE_VERSION}-linux-${cmake_arch}.tar.gz --output /tmp/cmake-${CMAKE_VERSION}.tar.gz \
+    && tar -xzf /tmp/cmake-${CMAKE_VERSION}.tar.gz -C /tmp/ && cd /tmp/cmake-${CMAKE_VERSION}-linux-${cmake_arch}/ \
+    && cp -r bin/ share/ doc/ /usr/local/ && rm -rf /tmp/cmake-${CMAKE_VERSION}*
+
+
+# Install pip using get-pip.py for all Python versions
+# This is the simplest solution that works across:
+# - Multiple Ubuntu versions (22.04, 24.04) with different restrictions
+# - System Python and deadsnakes PPA versions
+# - Python versions with and without distutils (3.9-3.14)
+# Alternative approaches (apt, ensurepip) fail due to Debian restrictions and distutils removal in Python 3.12+
+
+# Upgrade system pip first to support --break-system-packages flag
+# using --force-reinstall to replace the debian packages (eg wheel) with the pip packages
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3 - --break-system-packages --force-reinstall --ignore-installed
+
+# install pip packages needed only for the system python
+COPY requirements.sys_python.txt /tmp/requirements.sys_python.txt
+RUN python3 -m pip install --break-system-packages --force-reinstall -r /tmp/requirements.sys_python.txt && \
+    rm -rf /root/.cache/pip /tmp/requirements.sys_python.txt
+
+
+# Install/Update pip for all python versions in one layer
+# Using get-pip.py consistently for all versions to avoid per-version quirks
+RUN set -e; \
+    for pyver in $PYTHON_VERSIONS; do \
+        echo "Installing pip for Python $pyver" && \
+        curl -sS https://bootstrap.pypa.io/get-pip.py | python$pyver - --break-system-packages --force-reinstall --ignore-installed; \
+    done
+
+
+# Install python packages (common dependencies, no torch, no numpy)
+COPY requirements.no_torch_no_numpy.txt /tmp/requirements.no_torch_no_numpy.txt
+RUN set -e; \
+    for pyver in $PYTHON_VERSIONS; do \
+        python$pyver -m pip install --break-system-packages --ignore-installed -r /tmp/requirements.no_torch_no_numpy.txt; \
+    done
+
+# Install numpy based on VER_NUMPY_MAJOR
+COPY requirements.numpy${VER_NUMPY_MAJOR}.txt /tmp/requirements.numpy.txt
+RUN set -e; \
+    for pyver in $PYTHON_VERSIONS; do \
+        python$pyver -m pip install --break-system-packages --ignore-installed -r /tmp/requirements.numpy.txt; \
+    done
+
+RUN rm -rf /root/.cache/pip /tmp/requirements.no_torch_no_numpy.txt /tmp/requirements.numpy.txt
+
+
+# Install torch
+# breaking down per python version for better caching of layers
+
+# Install torch for Python 3.9 if present in PYTHON_VERSIONS
+RUN if echo "$PYTHON_VERSIONS" | grep -q "3.9"; then \
+        python3.9 -m pip install --break-system-packages ${TORCH_ADDITIONAL_INDEX_URL:+--extra-index-url $TORCH_ADDITIONAL_INDEX_URL} torch==$VER_TORCH; \
+    fi
+
+# Install torch for Python 3.10 if present in PYTHON_VERSIONS
+RUN if echo "$PYTHON_VERSIONS" | grep -q "3.10"; then \
+        python3.10 -m pip install --break-system-packages ${TORCH_ADDITIONAL_INDEX_URL:+--extra-index-url $TORCH_ADDITIONAL_INDEX_URL} torch==$VER_TORCH; \
+    fi
+
+# Install torch for Python 3.11 if present in PYTHON_VERSIONS
+RUN if echo "$PYTHON_VERSIONS" | grep -q "3.11"; then \
+        python3.11 -m pip install --break-system-packages ${TORCH_ADDITIONAL_INDEX_URL:+--extra-index-url $TORCH_ADDITIONAL_INDEX_URL} torch==$VER_TORCH; \
+    fi
+
+# Install torch for Python 3.12 if present in PYTHON_VERSIONS
+RUN if echo "$PYTHON_VERSIONS" | grep -q "3.12"; then \
+        python3.12 -m pip install --break-system-packages ${TORCH_ADDITIONAL_INDEX_URL:+--extra-index-url $TORCH_ADDITIONAL_INDEX_URL} torch==$VER_TORCH; \
+    fi
+
+# Install torch for Python 3.13 if present in PYTHON_VERSIONS
+RUN if echo "$PYTHON_VERSIONS" | grep -q "3.13"; then \
+        python3.13 -m pip install --break-system-packages ${TORCH_ADDITIONAL_INDEX_URL:+--extra-index-url $TORCH_ADDITIONAL_INDEX_URL} torch==$VER_TORCH; \
+    fi
+
+# Install torch for Python 3.14 if present in PYTHON_VERSIONS
+RUN if echo "$PYTHON_VERSIONS" | grep -q "3.14"; then \
+        python3.14 -m pip install --break-system-packages ${TORCH_ADDITIONAL_INDEX_URL:+--extra-index-url $TORCH_ADDITIONAL_INDEX_URL} torch==$VER_TORCH; \
+    fi
+
+# Clean up pip cache
+RUN rm -rf /root/.cache/pip
+
+WORKDIR /workspace

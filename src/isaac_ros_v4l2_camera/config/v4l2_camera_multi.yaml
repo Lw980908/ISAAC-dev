@@ -1,0 +1,60 @@
+cameras:
+  - name: "v4l2_gpu_camera_left"
+    namespace: "left"
+    device: "/dev/video0"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    buffer_count: 2
+    camera_link_frame_name: "left_camera"
+    optical_frame_name: "left_camera_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "v4l2_gpu_camera_right"
+    namespace: "right"
+    device: "/dev/video1"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    buffer_count: 2
+    camera_link_frame_name: "right_camera"
+    optical_frame_name: "right_camera_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "v4l2_gpu_camera_front"
+    namespace: "front"
+    device: "/dev/video2"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    buffer_count: 2
+    camera_link_frame_name: "front_camera"
+    optical_frame_name: "front_camera_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "v4l2_gpu_camera_back"
+    namespace: "back"
+    device: "/dev/video3"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    buffer_count: 2
+    camera_link_frame_name: "back_camera"
+    optical_frame_name: "back_camera_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"

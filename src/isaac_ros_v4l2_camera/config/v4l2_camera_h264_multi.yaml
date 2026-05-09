@@ -1,0 +1,226 @@
+# V4L2 相机 + H264 编码器配置文件
+#
+# 数据流: V4l2GpuCameraNode -> NITROS NV12 -> H264 Encoder -> RTSP Server
+
+# ==================== 相机配置 ====================
+cameras:
+  - name: "image_acquisition_node"
+    namespace: "camera0"
+    device: "/dev/video0"
+    width: 2880
+    height: 1860
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic" # 可选："gpu"（默认）或 "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera0"
+    optical_frame_name: "camera0_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera4"
+    device: "/dev/video4"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera4"
+    optical_frame_name: "camera4_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera5"
+    device: "/dev/video5"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera5"
+    optical_frame_name: "camera5_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera6"
+    device: "/dev/video6"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera6"
+    optical_frame_name: "camera6_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera7"
+    device: "/dev/video7"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera7"
+    optical_frame_name: "camera7_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+# ==================== H264 编码器配置 ====================
+# codec: 1 # 0：H264，1：H265
+encoders:
+  - name: "encoder_node"
+    namespace: "camera0"
+    codec: 1
+    input_width: 2880
+    input_height: 1860
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 12000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+  - name: "encoder_node"
+    namespace: "camera4"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2 # 2：CBR，3：VBR
+    bitrate: 12000000 # 单位：bps
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom" # 自定义配置，根据实际需求调整
+
+  - name: "encoder_node"
+    namespace: "camera5"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 12000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+  - name: "encoder_node"
+    namespace: "camera6"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 12000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+  - name: "encoder_node"
+    namespace: "camera7"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 12000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+# ==================== RTSP 推流配置 ====================
+streams:
+  - name: "rtsp_stream_node"
+    namespace: "camera0"
+    stream_name: "camera0"
+    port: 8554
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera4"
+    stream_name: "camera4"
+    port: 8555
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera5"
+    stream_name: "camera5"
+    port: 8556
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera6"
+    stream_name: "camera6"
+    port: 8557
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera7"
+    stream_name: "camera7"
+    port: 8558
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+

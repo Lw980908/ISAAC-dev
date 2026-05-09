@@ -1,0 +1,175 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# Modified: 支持 NV12/BGR8 输入到编码器
+# - 若上游协商到 NV12：颜色转换算子可作为 passthrough（输出仍为 NV12）
+# - 若上游协商到 BGR8：在图内进行 BGR8 -> NV12 转换，再送入硬编
+---
+name: global
+components:
+- name: adapter
+  type: nvidia::isaac::tensor_ops::ImageAdapter
+  parameters:
+    message_type: "VideoBuffer"
+- name: stream
+  type: nvidia::isaac::tensor_ops::TensorStream
+  parameters:
+    backend_type: "VPI"
+    engine_type: "GPU"
+- name: encoder_context
+  type: nvidia::gxf::VideoEncoderContext
+  parameters:
+    scheduling_term: encoder_response/async_st
+---
+name: color_converter
+components:
+- name: data_receiver
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 2
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: data_receiver
+    min_size: 1
+- name: data_transmitter
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: data_transmitter
+    min_size: 1
+- name: pool
+  type: nvidia::gxf::BlockMemoryPool
+  parameters:
+    storage_type: 1
+    # 注意：BlockMemoryPool 不允许 block_size=0。
+    # 这里给一个非 0 的占位值，实际会在 EncoderNode::postLoadGraphCallback()
+    # 里根据 input_width/input_height 动态设置为 NV12 帧大小 (w*h*3/2)。
+    block_size: 1
+    num_blocks: 8
+- name: color_converter_operator
+  type: nvidia::isaac::tensor_ops::StreamConvertColorFormat
+  parameters:
+    # 输出为 NV12，供硬件编码器使用
+    output_type: "NV12"
+    receiver: data_receiver
+    transmitter: data_transmitter
+    pool: pool
+    input_adapter: global/adapter
+    output_adapter: global/adapter
+    output_name: "image"
+    stream: global/stream
+- type: nvidia::gxf::MemoryAvailableSchedulingTerm
+  parameters:
+    allocator: pool
+    min_blocks: 1
+---
+name: encoder
+components:
+- name: data_receiver
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 1 # buffer size for the encoder
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: data_receiver
+    min_size: 1
+- name: encoder_request
+  type: nvidia::gxf::VideoEncoderRequest
+  parameters:
+    input_frame: data_receiver
+    inbuf_storage_type: 1
+    profile: 0
+    qp: 20
+    hw_preset_type: 0
+    input_width: 1920
+    input_height: 1080
+    input_format: nv12
+    config: pframe_cqp
+    iframe_interval: 5
+    rate_control_mode: 0
+    videoencoder_context: global/encoder_context
+---
+name: encoder_response
+components:
+- name: output
+  type: nvidia::gxf::DoubleBufferTransmitter
+  parameters:
+    capacity: 1
+- type: nvidia::gxf::DownstreamReceptiveSchedulingTerm
+  parameters:
+    transmitter: output
+    min_size: 1
+- name: pool
+  type: nvidia::gxf::BlockMemoryPool
+  parameters:
+    storage_type: 0
+    block_size: 8388608
+    num_blocks: 4
+- type: nvidia::gxf::VideoEncoderResponse
+  parameters:
+    videoencoder_context: global/encoder_context
+    output_transmitter: output
+    outbuf_storage_type: 0
+    pool: pool
+- name: async_st
+  type: nvidia::gxf::AsynchronousSchedulingTerm
+- type: nvidia::gxf::MemoryAvailableSchedulingTerm
+  parameters:
+    allocator: pool
+    min_blocks: 1
+---
+name: sink
+components:
+- name: signal
+  type: nvidia::gxf::DoubleBufferReceiver
+  parameters:
+    capacity: 1
+- type: nvidia::gxf::MessageAvailableSchedulingTerm
+  parameters:
+    receiver: signal
+    min_size: 1
+- name: sink
+  type: nvidia::isaac_ros::MessageRelay
+  parameters:
+    source: signal
+    max_waiting_count: 1
+    drop_waiting: false
+---
+name: connections
+components:
+- type: nvidia::gxf::Connection
+  parameters:
+    source: color_converter/data_transmitter
+    target: encoder/data_receiver
+- type: nvidia::gxf::Connection
+  parameters:
+    source: encoder_response/output
+    target: sink/signal
+---
+components:
+- name: clock
+  type: nvidia::gxf::RealtimeClock
+- type: nvidia::gxf::EventBasedScheduler
+  parameters:
+    clock: clock
+    stop_on_deadlock: false
+- type: nvidia::gxf::JobStatistics
+  parameters:
+    clock: clock

@@ -1,0 +1,313 @@
+# V4L2 相机 + 感知节点（目标检测）+ H264 编码器配置文件
+#
+# ==================== 数据流说明 ====================
+#
+# 方案 A: 使用 NITROS 协商话题（isaac_ros_v4l2_camera）
+#   数据流: V4l2GpuCameraNode -> NITROS NV12 -> PerceptionComponent -> NITROS NV12 -> H264 Encoder
+#   特点: 相机到编码器全程 GPU 零拷贝，但感知需要 NV12↔BGR 双向转换
+#   配置: encoding_format_sub: "NITROS_NV12", encoding_format_pub: "NITROS_NV12"
+#
+# 方案 B: 使用标准 ROS2 话题（需要标准 v4l2 驱动，如 ros2_v4l2_camera）
+#   数据流: v4l2_camera -> sensor_msgs::msg::Image (BGR) -> PerceptionComponent -> NITROS NV12 -> H264 Encoder
+#   特点: 感知直接接收 BGR，只需 BGR→NV12 单向转换，效率更高
+#   配置: encoding_format_sub: "IMAGE_RAW", encoding_format_pub: "NITROS_NV12"
+#
+# 推荐:
+#   - 如果使用 isaac_ros_v4l2_camera: 使用方案 A
+#   - 如果使用标准相机驱动: 使用方案 B（更高效）
+#
+# 组件名 = namespace/name，如：left/v4l2_gpu_camera_left -- 采集左相机组件名称
+
+# ==================== 相机配置 ====================
+cameras:
+  - name: "image_acquisition_node"
+    namespace: "camera0"
+    device: "/dev/video0"
+    width: 2880
+    height: 1860
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic" # 可选："gpu"（默认）或 "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera0"
+    optical_frame_name: "camera0_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera4"
+    device: "/dev/video2"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera4"
+    optical_frame_name: "camera4_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera5"
+    device: "/dev/video5"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera5"
+    optical_frame_name: "camera5_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera6"
+    device: "/dev/video6"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera6"
+    optical_frame_name: "camera6_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+  - name: "image_acquisition_node"
+    namespace: "camera7"
+    device: "/dev/video7"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera7"
+    optical_frame_name: "camera7_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+# ==================== 感知节点配置 ====================
+perception:
+  # ROS2 配置
+  ros2_enabled: true
+  use_ros2_component_container: true
+  
+  # ========== 多路相机配置 ==========
+  # 相机数量（会从 camera_namespaces 自动推断，此处可省略）
+  num_sources: 4
+  
+  # 相机命名空间列表（必须与 cameras 配置中的 namespace 一致）
+  # 用于构建订阅/发布话题名称
+  camera_namespaces:
+    - "camera4"
+    - "camera5"
+    - "camera6"
+    - "camera7"
+  
+  # 相机 ID 列表
+  camera_ids: [4, 5, 6, 7]
+  
+  # 输入分辨率 [width1, height1, width2, height2, ...]
+  # 必须与相机配置中的 width/height 一致
+  input_sizes: [1920, 1536, 1920, 1536, 1920, 1536, 1920, 1536]
+  
+  # ROI 区域 [x1, y1, w1, h1, x2, y2, w2, h2, ...]
+  # 每4个值表示一个相机的 ROI (x, y, width, height)
+  roi_regions: [0, 0, 1920, 1536, 0, 0, 1920, 1536, 0, 0, 1920, 1536, 0, 0, 1920, 1536]
+  
+  # ========== 订阅/发布格式配置 ==========
+  # 可选值:
+  #   - "NITROS_NV12": NITROS 协商话题（NV12 格式，GPU 数据）
+  #   - "IMAGE_RAW": 标准 sensor_msgs::msg::Image（BGR 格式，CPU 数据）
+  #
+  # 订阅格式 - 取决于上游相机驱动:
+  #   - isaac_ros_v4l2_camera 发布 NITROS_NV12 -> 设置为 "NITROS_NV12"
+  #   - ros2_v4l2_camera 发布 Image -> 设置为 "IMAGE_RAW"（推荐，效率更高）
+  encoding_format_sub: "NITROS_NV12"
+  
+  # 发布格式 - 取决于下游节点:
+  #   - H264 编码器需要 NITROS_NV12 -> 设置为 "NITROS_NV12"
+  #   - 其他标准 ROS2 节点 -> 设置为 "IMAGE_RAW"
+  encoding_format_pub: "NITROS_NV12"
+  
+  # ========== 话题配置 ==========
+  # 话题前缀（空字符串使用命名空间）
+  # 订阅话题格式: /{camera_namespace}/image_raw
+  # 例如: /left/image_raw, /right/image_raw
+  nitros_topic_prefix: ""
+  
+  # 发布话题格式: /{camera_namespace}/processed_image
+  # 例如: /left/processed_image, /right/processed_image
+  nitros_pub_topic_prefix: ""
+  
+  # GUI 显示（调试用，生产环境建议关闭）
+  show_gui: false
+
+  # 处理方法: "MULTI_THREADS_MULTI_SOURCES" 或 "SHARED_MODEL_THREAD_MULTI_SOURCES" 或 "SINGLE_THREAD_SINGLE_SOURCE" 或 "CAMERA_COMBINED_WITH_LIDAR"
+  process_method: "SHARED_MODEL_THREAD_MULTI_SOURCES"
+
+# ==================== H264 编码器配置 ====================
+# 编码器订阅感知节点的输出（processed_image）
+# 注意：编码器需要 NITROS NV12 格式输入
+# codec: 1 # 0：H264，1：H265
+encoders:
+  - name: "encoder_node"
+    namespace: "camera0"
+    codec: 1
+    input_width: 2880
+    input_height: 1860
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_raw"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 12000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+  - name: "encoder_node"
+    namespace: "camera4"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    # 无感知时订阅 image_raw（直接从相机）
+    input_topic: "image_raw"
+    # 有感知时订阅 processed_image（从感知节点）
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20 # 质量参数，0-51（0：最高质量）
+    rate_control_mode: 2 # 2：CBR，3：VBR
+    bitrate: 4000000 # 单位：bps
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom" # 自定义配置，根据实际需求调整
+
+  - name: "encoder_node"
+    namespace: "camera5"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 4000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+  - name: "encoder_node"
+    namespace: "camera6"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 4000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+  - name: "encoder_node"
+    namespace: "camera7"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 4000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+# ==================== RTSP 推流配置 ====================
+streams:
+  - name: "rtsp_stream_node"
+    namespace: "camera0"
+    stream_name: "camera0"
+    port: 8554
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera4"
+    stream_name: "camera4"
+    port: 8555
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera5"
+    stream_name: "camera5"
+    port: 8556
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera6"
+    stream_name: "camera6"
+    port: 8557
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+
+  - name: "rtsp_stream_node"
+    namespace: "camera7"
+    stream_name: "camera7"
+    port: 8558
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 2
+    nitros_compressed_image: "image_compressed"
+    max_queue_frames: 2
+

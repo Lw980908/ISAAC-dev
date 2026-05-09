@@ -1,0 +1,60 @@
+..
+  # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  # SPDX-License-Identifier: Apache-2.0
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  # http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+
+.. _v0.12.0-beta:
+
+v0.12.0-beta
+============
+
+Release Highlights
+------------------
+
+CV-CUDA v0.12.0 includes critical bug fixes alongside the following changes:​
+
+* **New Features**:​
+
+  * Increased functional test coverage of color conversions. ​
+  * Reintroduced from 24.07: Improved performance of color conversion operators (e.g., 2x faster RGB2YUV).
+
+* **Bug Fixes**:​
+
+  * Fixed bug in YUV(420) conversions: The CvtColor operator incorrectly computed the data location of the second chromaticity channel for conversions.​
+  * Fixed bug in YUV(422) conversions: The CvtColor operator incorrectly interpreted the interleaved YUV(422) data layout as a three-channel tensor.​
+  * Prevent CV_16F alpha addition: some color conversions in the CvtColor operator allowed for the addition of an alpha channel to the destination tensor, which is undefined for the CV_16F data type.
+
+
+Compatibility and Known Limitations
+-----------------------------------
+
+For the full list, see main README on `CV-CUDA GitHub <https://github.com/CVCUDA/CV-CUDA>`_.
+
+License
+-------
+
+CV-CUDA is licensed under the `Apache 2.0 <https://github.com/CVCUDA/CV-CUDA/blob/main/LICENSE.md>`_ license.
+
+Resources
+---------
+
+1. `CV-CUDA GitHub <https://github.com/CVCUDA/CV-CUDA>`_
+2. `CV-CUDA Increasing Throughput and Reducing Costs for AI-Based Computer Vision with CV-CUDA <https://developer.nvidia.com/blog/increasing-throughput-and-reducing-costs-for-computer-vision-with-cv-cuda/>`_
+3. `NVIDIA Announces Microsoft, Tencent, Baidu Adopting CV-CUDA for Computer Vision AI <https://blogs.nvidia.com/blog/2023/03/21/cv-cuda-ai-computer-vision/>`_
+4. `CV-CUDA helps Tencent Cloud audio and video PaaS platform achieve full-process GPU acceleration for video enhancement AI <https://developer.nvidia.com/zh-cn/blog/cv-cuda-high-performance-image-processing/>`_
+
+Acknowledgements
+----------------
+
+CV-CUDA is developed jointly by NVIDIA and the ByteDance Machine Learning team.

@@ -1,0 +1,13 @@
+v4l2_gpu_camera_node:
+  ros__parameters:
+    device: "/dev/video0"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    # 输出编码（同时决定 NITROS 协商类型）："nv12" 或 "bgr8"
+    output_encoding: "nv12"
+    buffer_count: 4
+    camera_link_frame_name: "camera"
+    optical_frame_name: "camera_optical"
+    camera_info_url: ""

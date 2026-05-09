@@ -1,0 +1,112 @@
+# MP4 多视频发布（NITROS NV12） + 感知 + H264 编码 + RTSP 推流
+#
+# 数据流：
+#   Mp4Nv12NitrosPublisherNode -> NitrosImage (NV12) -> PerceptionComponent -> NitrosImage (NV12) -> H264 Encoder -> RTSP
+#
+# 说明：
+# - 由于下游感知/编码需要固定分辨率，本 YAML 里必须为每路视频显式配置 width/height。
+# - input_sizes / roi_regions 会从 videos 自动生成（launch 内），也可以在 perception 里覆盖。
+
+videos:
+  - name: "mp4_nv12_left"
+    namespace: "left"
+    file_path: "/home/nvidia/ISAAC/src/videos/3.mp4"
+    loop: true # 循环播放
+    gpu_id: 0
+    width: 1920
+    height: 1536
+    publish_fps: 30.0
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+    camera_link_frame_name: "left_camera"
+    optical_frame_name: "left_camera_optical"
+    camera_info_url: ""
+
+  - name: "mp4_nv12_right"
+    namespace: "right"
+    file_path: "/home/nvidia/ISAAC/src/videos/4.mp4"
+    loop: true
+    gpu_id: 0
+    width: 1920
+    height: 1536
+    publish_fps: 30.0
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+    camera_link_frame_name: "right_camera"
+    optical_frame_name: "right_camera_optical"
+    camera_info_url: ""
+
+# ==================== 感知节点配置 ====================
+perception:
+  ros2_enabled: true
+  use_ros2_component_container: true
+  
+  camera_namespaces:
+    - "left"
+    - "right"
+
+  # 相机 ID 列表，用于判断输入源数量
+  camera_ids: [0, 1]
+
+  # 订阅/发布 NITROS NV12
+  encoding_format_sub: "NITROS_NV12"
+  encoding_format_pub: "NITROS_NV12"
+
+  nitros_topic_prefix: ""
+  nitros_pub_topic_prefix: ""
+
+  show_gui: false
+  process_method: "SHARED_MODEL_THREAD_MULTI_SOURCES"
+
+# ==================== H264 编码器配置 ====================
+encoders:
+  - name: "h264_encoder_left"
+    namespace: "left"
+    codec: 0
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "pframe_cqp"
+
+  - name: "h264_encoder_right"
+    namespace: "right"
+    codec: 0
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "pframe_cqp"
+
+# ==================== RTSP 推流配置（可选）====================
+streams:
+  - name: "rtsp_left"
+    namespace: "left"
+    stream_name: "left"
+    port: 8554
+    video_type: "h264"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+
+  - name: "rtsp_right"
+    namespace: "right"
+    stream_name: "right"
+    port: 8555
+    video_type: "h264"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+
