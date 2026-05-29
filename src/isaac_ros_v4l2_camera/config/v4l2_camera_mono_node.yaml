@@ -5,9 +5,10 @@ v4l2_gpu_camera_node:
     height: 1536
     framerate: 30
     pixel_format: "YUYV"
-    # 输出编码（同时决定 NITROS 协商类型）："nv12" 或 "bgr8"
     output_encoding: "nv12"
     buffer_count: 4
-    camera_link_frame_name: "camera"
-    optical_frame_name: "camera_optical"
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+    camera_link_frame_name: "camera0"
+    optical_frame_name: "camera0_optical"
     camera_info_url: ""

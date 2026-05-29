@@ -124,7 +124,7 @@ void MQTTClient::workerThread() {
                               .password(password_)
                               .clean_session(true)
                               .connect_timeout(std::chrono::seconds(5))
-                              .finalize();
+                              .finalize(); 
 
           client_.set_callback(*this);
           auto connToken = client_.connect(connOpts);

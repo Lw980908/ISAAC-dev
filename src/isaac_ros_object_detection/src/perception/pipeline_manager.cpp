@@ -1,5 +1,4 @@
 #include "pipeline_manager.h"
-#include "camera_combined_with_lidar.h"
 #include "multi_threads_multi_sources.h"
 #include "shared_model_thread_multi_sources.h"
 #include "single_thread_single_source.h"
@@ -27,13 +26,6 @@ createPipelineManager(InputConfig input_config) {
     sample::gLogInfo << "Creating SharedModelMultiSourcesPipelineManager..."
                      << std::endl;
     return std::make_unique<SharedModelMultiSourcesPipelineManager>(
-        input_config);
-  } else if (input_config.process_method ==
-             ProcessMethod::CAMERA_COMBINED_WITH_LIDAR) // 相机与雷达组合输入源
-  {
-    sample::gLogInfo << "Creating CameraCombinedWithLidarPipelineManager..."
-                     << std::endl;
-    return std::make_unique<CameraCombinedWithLidarPipelineManager>(
         input_config);
   }
 

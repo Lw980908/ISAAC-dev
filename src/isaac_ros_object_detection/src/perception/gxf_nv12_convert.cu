@@ -17,7 +17,8 @@ __global__ void GxfNV12ToBGRKernel(uint8_t *__restrict__ bgr,
                                    const uint8_t *__restrict__ y_plane,
                                    const uint8_t *__restrict__ uv_plane,
                                    int width, int height, int y_stride,
-                                   int uv_stride, int bgr_stride) {
+                                   int uv_stride, int bgr_stride,
+                                   int swap_uv) {
   const int x = blockIdx.x * blockDim.x + threadIdx.x;
   const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -34,8 +35,10 @@ __global__ void GxfNV12ToBGRKernel(uint8_t *__restrict__ bgr,
   // uv_plane[uv_y * uv_stride + uv_x * 2] = U
   // uv_plane[uv_y * uv_stride + uv_x * 2 + 1] = V
   const int uv_offset = uv_y * uv_stride + uv_x * 2;
-  const float U = static_cast<float>(uv_plane[uv_offset]) - 128.0f;
-  const float V = static_cast<float>(uv_plane[uv_offset + 1]) - 128.0f;
+  const float U =
+      static_cast<float>(uv_plane[uv_offset + (swap_uv ? 1 : 0)]) - 128.0f;
+  const float V =
+      static_cast<float>(uv_plane[uv_offset + (swap_uv ? 0 : 1)]) - 128.0f;
 
   // YUV (BT.601) 到 BGR 转换
   // R = Y + 1.402 * V
@@ -158,10 +161,11 @@ extern "C" {
 
 // ============== 新的直接转换函数 ==============
 
-// GXF NV12 直接转换为 BGR（GPU 到 GPU）
-cudaError_t ConvertGxfNV12ToBGR(void *bgr_gpu, const void *nv12_gpu, int width,
-                                int height, int y_stride, int uv_stride,
-                                int bgr_stride, cudaStream_t stream) {
+// GXF NV12/NV21 直接转换为 BGR（GPU 到 GPU）
+cudaError_t ConvertGxfNV12ToBGREx(void *bgr_gpu, const void *nv12_gpu,
+                                  int width, int height, int y_stride,
+                                  int uv_stride, int bgr_stride, int swap_uv,
+                                  cudaStream_t stream) {
   // GXF NV12 布局：Y 平面 + UV 平面
   const size_t y_size = static_cast<size_t>(y_stride) * height;
   const uint8_t *y_plane = static_cast<const uint8_t *>(nv12_gpu);
@@ -172,9 +176,17 @@ cudaError_t ConvertGxfNV12ToBGR(void *bgr_gpu, const void *nv12_gpu, int width,
 
   GxfNV12ToBGRKernel<<<grid, block, 0, stream>>>(
       static_cast<uint8_t *>(bgr_gpu), y_plane, uv_plane, width, height,
-      y_stride, uv_stride, bgr_stride);
+      y_stride, uv_stride, bgr_stride, swap_uv);
 
   return cudaGetLastError();
+}
+
+// GXF NV12 直接转换为 BGR（GPU 到 GPU）
+cudaError_t ConvertGxfNV12ToBGR(void *bgr_gpu, const void *nv12_gpu, int width,
+                                int height, int y_stride, int uv_stride,
+                                int bgr_stride, cudaStream_t stream) {
+  return ConvertGxfNV12ToBGREx(bgr_gpu, nv12_gpu, width, height, y_stride,
+                               uv_stride, bgr_stride, 0, stream);
 }
 
 // BGR 转换为 GXF NV12（GPU 到 GPU）

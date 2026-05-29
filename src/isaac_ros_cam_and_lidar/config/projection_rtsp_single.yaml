@@ -1,0 +1,148 @@
+cameras:
+  - name: "v4l2_gpu_camera_front"
+    namespace: "front"
+    device: "/dev/video0"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "front_camera"
+    optical_frame_name: "front_camera_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+projection_demo:
+  image_topic: "/front/image_raw"
+  use_nitros_image: true
+  nitros_image_format: "nitros_image_nv12"
+  input_nv12_variant: "nv12"
+  lidar_topic: "/livox/lidar"
+  use_livox_custom_msg: true
+  overlay_topic: "/front/processed_image"
+  bev_topic: "/front/projection_bev"
+  colored_cloud_topic: "/front/projection_colored_cloud"
+  publish_colored_cloud: true
+  enable_colored_cloud_sliding_window: false # true时累积滑窗点云后发布，false时只发布当前帧点云
+  colored_cloud_window_ms: 1000 # 滑动窗口大小，单位毫秒
+  colored_cloud_max_points: 200000 # 每个窗口的最大点数
+  draw_bev_on_image_callback: false
+  calib_result_path: "/home/nvidia/2026Q1/ISAAC/src/isaac_ros_cam_and_lidar/config/calib_result.yaml"
+  bev_width: 800
+  bev_height: 1200
+  bev_x_min_m: 0.0
+  bev_x_max_m: 15.0
+  bev_y_min_m: -5.0
+  bev_y_max_m: 5.0
+  bev_flip_y: true
+  draw_every_nth_point: 2 # 绘制每隔n个点
+  point_radius_px: 2 # 点云点的半径，单位像素
+  camera_frame_timeout_ms: 300 # 相机帧超时时间，单位毫秒
+  cloud_frame_timeout_ms: 300 # 点云帧超时时间，单位毫秒
+  grid_step_m: 1.0 # 网格步长，单位米
+  overlay_only_front_points: true # 是否仅在图像上叠加前方的点云
+  enable_cloud_filter: true # 是否启用点云滤波
+  filter_min_range_m: 0.5 # 点云滤波的最小范围，单位米
+  filter_max_range_m: 80.0 # 点云滤波的最大范围，单位米
+  filter_min_z_m: -2.5 # 点云滤波的最小高度，单位米
+filter_max_z_m: 3.0 # 点云滤波的最大高度，单位米
+filter_voxel_leaf_size_m: 0.08 # 点云滤波的体素大小，单位米
+filter_radius_m: 0.25 # 点云滤波的半径，单位米
+filter_min_neighbors: 2 # 点云滤波的最小邻居数
+
+enable_point_cloud_rendering: true # 总开关，控制是否运行渲染节点和推流
+
+point_cloud_renderer:
+  enable: true # 是否启用点云渲染
+  publish_enabled: true # 是否发布渲染结果
+  cloud_topic: "/front/projection_colored_cloud"
+  output_topic: "/front/colored_cloud_view"
+  frame_id: "front_colored_cloud_left_view"
+  width: 1920
+  height: 1536
+  fps: 20.0
+  yaw_deg: -30.0 # 左侧视角：从车辆/雷达左侧看向点云
+  pitch_deg: -15.0 # 负值略微俯视，正值略微仰视
+  roll_deg: 0.0 # 正值顺时针，负值逆时针
+  camera_distance_m: 8.0 # 相机距离，单位米
+  look_at_x_m: 4.5 # 观察点的x坐标，单位米
+  look_at_y_m: 0.0 # 观察点的y坐标，单位米
+  look_at_z_m: 0.6 # 观察点的z坐标，单位米
+  focal_length_px: 1800.0 # 相机的焦距，单位像素；越大画面越“放大”
+  max_points: 200000 # 最大点数
+  splat_radius_min_px: 2 # 远处点至少绘制为多大的splat
+  splat_radius_max_px: 7 # 近处点最大的splat半径
+  splat_depth_falloff_m: 18.0 # 超过该深度后splat尺寸逐渐退到最小
+  splat_outer_alpha: 0.32 # 外层splat透明度
+  splat_inner_alpha: 0.85 # 内核splat透明度
+  splat_ellipse_ratio: 1.35 # 沿垂直方向拉伸的比例，用来填补稀疏扫描缝隙
+  splat_draw_core: true # 是否绘制更亮的内核，提升细节感
+  stale_cloud_timeout_ms: 1000 # 超过该时间未收到新点云时显示等待提示，0为永不清空旧帧
+  draw_grid: true # 是否绘制网格
+  grid_step_m: 1.0 # 网格步长，单位米
+  grid_extent_m: 20.0 # 网格范围，单位米
+  background_b: 16 # 背景颜色的蓝色分量
+  background_g: 20 # 背景颜色的绿色分量
+  background_r: 24 # 背景颜色的红色分量
+
+encoders:
+  - name: "h265_encoder_front"
+    namespace: "front"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    compatible_input_format: "nitros_image_nv12"
+    input_topic: "processed_image"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 4000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+  - name: "h265_encoder_colored_cloud_view"
+    namespace: "front"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    compatible_input_format: "nitros_image_nv12"
+    input_topic: "colored_cloud_view"
+    output_topic: "colored_cloud_view_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 2500000
+    framerate: 10
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+streams:
+  - name: "rtsp_front_projection"
+    namespace: "front"
+    stream_name: "front_projection"
+    port: 8556
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    # H265 clients need VPS/SPS/PPS plus an IDR when they connect.  A queue of
+    # 2 can drop those parameter sets while the projection node is doing CPU/GPU
+    # overlay work, which makes the RTSP stream look like it never starts.
+    max_queue_frames: 16
+  - name: "rtsp_colored_cloud_left_view"
+    namespace: "front"
+    stream_name: "front_colored_cloud_left"
+    port: 8557
+    video_type: "h265"
+    topic_name: "colored_cloud_view_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 16

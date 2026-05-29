@@ -180,7 +180,7 @@ ament_target_dependencies(${PROJECT_NAME}
     sensor_msgs
     geometry_msgs
     visualization_msgs
-    livox_ros_driver2
+
     cv_bridge
     OpenCV
     nlohmann_json
@@ -218,7 +218,6 @@ ament_target_dependencies(object_detection_node
     sensor_msgs
     geometry_msgs
     visualization_msgs
-    livox_ros_driver2
     cv_bridge
 )
 
@@ -249,7 +248,6 @@ ament_target_dependencies(perception_component
     sensor_msgs
     geometry_msgs
     visualization_msgs
-    livox_ros_driver2
     cv_bridge
     OpenCV
     nlohmann_json

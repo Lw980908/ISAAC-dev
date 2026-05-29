@@ -19,6 +19,7 @@
 #define ISAAC_ROS_V4L2_CAMERA__V4L2_GPU_CAMERA_NODE_HPP_
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <thread>
@@ -85,6 +86,7 @@ private:
 
   int src_pitch_{0};
   uint32_t sizeimage_{0};
+  int64_t rtcpu_offset_ns_{0};
   NvBufSurface *dst_surface_{nullptr}; // 输出 surface（NV12 或 BGRA）
 
   cudaStream_t cuda_stream_{nullptr};
@@ -102,4 +104,3 @@ private:
 } // namespace nvidia
 
 #endif // ISAAC_ROS_V4L2_CAMERA__V4L2_GPU_CAMERA_NODE_HPP_
-

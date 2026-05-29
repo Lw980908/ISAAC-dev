@@ -1,0 +1,90 @@
+# 相机 + 雷达联合检测专用配置
+# 当前 CAMERA_COMBINED_WITH_LIDAR 管线只支持单相机输入。
+
+cameras:
+  - name: "image_acquisition_node"
+    namespace: "camera0"
+    camera_id: 0
+    device: "/dev/video0"
+    width: 1920
+    height: 1536
+    framerate: 30
+    pixel_format: "YUYV"
+    output_encoding: "nv12"
+    transform_compute_mode: "vic"
+    buffer_count: 2
+    camera_link_frame_name: "camera0"
+    optical_frame_name: "camera0_optical"
+    camera_info_url: ""
+    image_topic: "image_raw"
+    camera_info_topic: "camera_info"
+
+perception:
+  ros2_enabled: true
+  use_ros2_component_container: true
+  camera_namespaces: ["camera0"]
+  camera_ids: [0]
+  input_sizes: [1920, 1536]
+  roi_regions: [0, 0, 1920, 1536]
+  encoding_format_sub: "NITROS_NV12"
+  encoding_format_pub: "NITROS_NV12"
+  nitros_topic_prefix: ""
+  nitros_pub_topic_prefix: ""
+  show_gui: false
+
+  livox_topic: "/livox/lidar"
+  livox_xfer_format: 1
+  calib_result_path: "/home/nvidia/2026Q1/ISAAC/src/isaac_ros_cam_and_lidar/config/calib_result.yaml"
+
+  distance_tooth_band_height_ratio: 0.12
+  distance_tooth_band_x_margin_ratio: 0.08
+  distance_tooth_band_y_offset_ratio: 0.0
+  distance_near_band_m: 0.08
+  distance_hold_max_dt_ms: 250.0
+  distance_outlier_mad_k: 3.5
+  distance_outlier_min_abs_m: 0.02
+  distance_min_z: 0.1
+  distance_max_z: 30.0
+  distance_max_age_ms: 200.0
+  distance_min_points: 5
+
+  bbox3d_enable: 0
+  bbox3d_window_ms: 1000.0
+  bbox3d_max_frames: 20
+  bbox3d_min_points: 80
+  bbox3d_max_points: 200000
+  bbox3d_max_age_ms: 300.0
+  bbox3d_depth_gate_m: 1.2
+  bbox3d_depth_bin_m: 0.2
+  bbox3d_roi_shrink_ratio: 0.08
+  bbox3d_hold_ms: 500.0
+
+encoders:
+  - name: "encoder_node"
+    namespace: "camera0"
+    codec: 1
+    input_width: 1920
+    input_height: 1536
+    input_topic: "image_raw"
+    input_topic_with_perception: "image_perceptual"
+    output_topic: "image_compressed"
+    qp: 20
+    rate_control_mode: 2
+    bitrate: 4000000
+    framerate: 30
+    hw_preset_type: 0
+    profile: 0
+    iframe_interval: 5
+    config: "custom"
+
+streams:
+  - name: "rtsp_stream_node"
+    namespace: "camera0"
+    stream_name: "camera0_lidar"
+    port: 8555
+    video_type: "h265"
+    topic_name: "image_compressed"
+    assume_annexb: true
+    use_nitros: true
+    nitros_format: "nitros_compressed_image"
+    max_queue_frames: 16

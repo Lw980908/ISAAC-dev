@@ -53,22 +53,34 @@ def generate_launch_description():
             description='Path to combined V4L2 + Perception + H264 YAML parameters file.'),
         DeclareLaunchArgument(
             'enable_perception',
-            default_value='true',
-            description='Enable perception node (object detection).'),
-        DeclareLaunchArgument(
-            'livox_xfer_format',
             default_value='',
-            description='Override livox_xfer_format for perception node (0/1). '
-                        'Empty uses YAML or node default.'),
+            description='Override YAML enable_perception switch: true/false. '
+                        'Empty uses YAML value.'),
+        DeclareLaunchArgument(
+            'enable_rtsp',
+            default_value='',
+            description='Override YAML enable_rtsp switch: true/false. '
+                        'Empty uses YAML value.'),
     ]
 
     def launch_setup(context, *args, **kwargs):
         params_path = LaunchConfiguration('params_file').perform(context)
-        enable_perception = LaunchConfiguration(
-            'enable_perception').perform(context).lower() == 'true'
 
         with open(params_path, 'r', encoding='utf-8') as handle:
             params_data = yaml.safe_load(handle) or {}
+
+        switches_config = params_data.get('switches', {})
+        if switches_config and not isinstance(switches_config, dict):
+            raise RuntimeError('YAML "switches" must be a map')
+
+        def resolve_bool(name, default_value):
+            arg_value = LaunchConfiguration(name).perform(context).strip().lower()
+            if arg_value in ('true', 'false'):
+                return arg_value == 'true'
+            return bool(switches_config.get(name, default_value))
+
+        enable_perception = resolve_bool('enable_perception', True)
+        enable_rtsp = resolve_bool('enable_rtsp', True)
 
         # ==================== 1. 相机节点 ====================
         cameras = params_data.get('cameras', [])
@@ -139,12 +151,22 @@ def generate_launch_description():
                 'MULTI_THREADS_MULTI_SOURCES': 0,
                 'SINGLE_THREAD_SINGLE_SOURCE': 1,
                 'SHARED_MODEL_THREAD_MULTI_SOURCES': 2,
-                'CAMERA_COMBINED_WITH_LIDAR': 3,
             }
             if isinstance(process_method_value, str):
+                if process_method_value == 'CAMERA_COMBINED_WITH_LIDAR':
+                    raise RuntimeError(
+                        'CAMERA_COMBINED_WITH_LIDAR has moved to '
+                        'isaac_ros_cam_and_lidar/launch/'
+                        'camera_combined_with_lidar_h264.launch.py')
                 process_method_int = process_method_map.get(
-                    process_method_value, process_method_map['SHARED_MODEL_THREAD_MULTI_SOURCES'])
+                    process_method_value,
+                    process_method_map['SHARED_MODEL_THREAD_MULTI_SOURCES'])
             elif isinstance(process_method_value, int):
+                if int(process_method_value) == 3:
+                    raise RuntimeError(
+                        'process_method=3 (CAMERA_COMBINED_WITH_LIDAR) has moved to '
+                        'isaac_ros_cam_and_lidar/launch/'
+                        'camera_combined_with_lidar_h264.launch.py')
                 process_method_int = int(process_method_value)
             else:
                 process_method_int = process_method_map['SHARED_MODEL_THREAD_MULTI_SOURCES']
@@ -206,14 +228,6 @@ def generate_launch_description():
                 # 其他感知参数
                 'show_gui': perception_config.get('show_gui', False),
             }
-
-            livox_xfer_format_arg = LaunchConfiguration(
-                'livox_xfer_format').perform(context).strip()
-            if livox_xfer_format_arg != '':
-                perception_params['livox_xfer_format'] = int(livox_xfer_format_arg)
-            elif 'livox_xfer_format' in perception_config:
-                perception_params['livox_xfer_format'] = int(
-                    perception_config.get('livox_xfer_format'))
 
             perception_nodes.append(
                 ComposableNode(
@@ -286,38 +300,39 @@ def generate_launch_description():
             raise RuntimeError('YAML "streams" must be a list')
 
         rtsp_nodes = []
-        for index, stream in enumerate(streams or []):
-            if not isinstance(stream, dict):
-                raise RuntimeError(f'stream[{index}] must be a map')
+        if enable_rtsp:
+            for index, stream in enumerate(streams or []):
+                if not isinstance(stream, dict):
+                    raise RuntimeError(f'stream[{index}] must be a map')
 
-            name = stream.get('name', f'rtsp_server_{index}')
-            namespace = stream.get('namespace', '')
-            use_nitros = stream.get('use_nitros', False)
-            params = {
-                'stream_name': stream.get('stream_name', name),
-                'port': stream.get('port', 8554),
-                'video_type': stream.get('video_type', 'h264'),
-                'topic_name': stream.get('topic_name', 'image_compressed'),
-                'assume_annexb': stream.get('assume_annexb', True),
-                'dump_frame': stream.get('dump_frame', 0),
-                'use_nitros': use_nitros,
-                'nitros_format': stream.get(
-                    'nitros_format', 'nitros_compressed_image'),
-            }
-            extra_arguments = []
-            if not use_nitros:
-                extra_arguments = [{'use_intra_process_comms': True}]
+                name = stream.get('name', f'rtsp_server_{index}')
+                namespace = stream.get('namespace', '')
+                use_nitros = stream.get('use_nitros', False)
+                params = {
+                    'stream_name': stream.get('stream_name', name),
+                    'port': stream.get('port', 8554),
+                    'video_type': stream.get('video_type', 'h264'),
+                    'topic_name': stream.get('topic_name', 'image_compressed'),
+                    'assume_annexb': stream.get('assume_annexb', True),
+                    'dump_frame': stream.get('dump_frame', 0),
+                    'use_nitros': use_nitros,
+                    'nitros_format': stream.get(
+                        'nitros_format', 'nitros_compressed_image'),
+                }
+                extra_arguments = []
+                if not use_nitros:
+                    extra_arguments = [{'use_intra_process_comms': True}]
 
-            rtsp_nodes.append(
-                ComposableNode(
-                    name=name,
-                    namespace=namespace,
-                    package='isaac_ros_rtsp_server',
-                    plugin='isaac_ros_rtsp_server::RtspServerNode',
-                    parameters=[params],
-                    extra_arguments=extra_arguments,
+                rtsp_nodes.append(
+                    ComposableNode(
+                        name=name,
+                        namespace=namespace,
+                        package='isaac_ros_rtsp_server',
+                        plugin='isaac_ros_rtsp_server::RtspServerNode',
+                        parameters=[params],
+                        extra_arguments=extra_arguments,
+                    )
                 )
-            )
 
         # ==================== 5. 组合所有节点到容器 ====================
         all_nodes = camera_nodes + perception_nodes + encoder_nodes + rtsp_nodes
@@ -336,4 +351,3 @@ def generate_launch_description():
 
     return launch.LaunchDescription(launch_args + [OpaqueFunction(
         function=launch_setup)])
-

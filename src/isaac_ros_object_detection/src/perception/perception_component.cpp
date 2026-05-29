@@ -65,6 +65,11 @@ PerceptionComponent::PerceptionComponent(const rclcpp::NodeOptions &options)
   input_config_.use_ros2_component_container =
       this->get_parameter("use_ros2_component_container").as_bool();
 
+  // ROS2/NITROS 模式下输入来自订阅话题，直接使用 CAMERA 输入源
+  if (input_config_.ros2_enabled) {
+    input_config_.source = InputStream::CAMERA;
+  }
+
   RCLCPP_INFO(this->get_logger(),
               "Perception params: process_method=%d ros2_enabled=%s "
               "use_ros2_component_container=%s",

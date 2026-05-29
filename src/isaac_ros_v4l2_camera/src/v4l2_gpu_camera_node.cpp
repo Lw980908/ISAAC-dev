@@ -22,8 +22,10 @@
 #include <fcntl.h>
 #include <linux/videodev2.h>
 #include <poll.h>
+#include <sys/time.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <errno.h>
@@ -31,6 +33,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <sstream>
@@ -125,6 +129,7 @@ constexpr int kDefaultHeight = 1536;
 constexpr int kDefaultFps = 30;
 constexpr int kDefaultBufferCount = 2; // 2 buffers is enough for one frame
 constexpr char kDefaultDevice[] = "/dev/video0";
+constexpr int64_t kNsPerSec = 1000000000LL;
 
 inline void ThrowErrno(const std::string &context) {
   std::stringstream error_msg;
@@ -185,6 +190,91 @@ uint32_t ToV4L2PixelFormat(const std::string &pixel_format) {
     return V4L2_PIX_FMT_YUYV;
   }
   throw std::runtime_error("Unsupported pixel_format: " + pixel_format);
+}
+
+int64_t ReadRtcpuOffsetNsFallback() {
+#if defined(__aarch64__)
+  uint64_t cycles = 0;
+  uint64_t frequency = 0;
+  asm volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+  asm volatile("mrs %0, cntvct_el0" : "=r"(cycles));
+  if (frequency == 0) {
+    return -1;
+  }
+
+  timespec tp{};
+  if (clock_gettime(CLOCK_MONOTONIC_RAW, &tp) != 0) {
+    return -1;
+  }
+
+  const auto tsc_ns = static_cast<uint64_t>(
+      (static_cast<__uint128_t>(cycles) * kNsPerSec) / frequency);
+  const auto raw_ns = static_cast<uint64_t>(tp.tv_sec) * kNsPerSec +
+                      static_cast<uint64_t>(tp.tv_nsec);
+  return static_cast<int64_t>((tsc_ns > raw_ns) ? (tsc_ns - raw_ns)
+                                                : (raw_ns - tsc_ns));
+#else
+  return -1;
+#endif
+}
+
+int64_t LoadRtcpuOffsetNs() {
+  char buf[128] = {0};
+  FILE *fp =
+      fopen("/sys/devices/system/clocksource/clocksource0/offset_ns", "r");
+  if (fp != nullptr) {
+    if (fgets(buf, sizeof(buf), fp) != nullptr) {
+      fclose(fp);
+      return static_cast<int64_t>(std::atoll(buf));
+    }
+    fclose(fp);
+  }
+
+  return ReadRtcpuOffsetNsFallback();
+}
+
+timespec NormalizeTimespec(timespec ts) {
+  while (ts.tv_nsec >= kNsPerSec) {
+    ++ts.tv_sec;
+    ts.tv_nsec -= kNsPerSec;
+  }
+  while (ts.tv_nsec < 0) {
+    --ts.tv_sec;
+    ts.tv_nsec += kNsPerSec;
+  }
+  return ts;
+}
+
+timespec RtcpuToRealtime(const timeval &rtcpu_time, int64_t offset_ns) {
+  timespec real_sample{};
+  timespec monotonic_sample{};
+  timespec monotonic_time{};
+
+  const int64_t ns = static_cast<int64_t>(rtcpu_time.tv_sec) * kNsPerSec +
+                     static_cast<int64_t>(rtcpu_time.tv_usec) * 1000LL -
+                     offset_ns;
+  monotonic_time.tv_sec = ns / kNsPerSec;
+  monotonic_time.tv_nsec = ns % kNsPerSec;
+  monotonic_time = NormalizeTimespec(monotonic_time);
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &monotonic_sample);
+  clock_gettime(CLOCK_REALTIME, &real_sample);
+
+  timespec real_time{};
+  real_time.tv_sec =
+      monotonic_time.tv_sec + (real_sample.tv_sec - monotonic_sample.tv_sec);
+  real_time.tv_nsec = monotonic_time.tv_nsec +
+                      (real_sample.tv_nsec - monotonic_sample.tv_nsec);
+  return NormalizeTimespec(real_time);
+}
+
+const char *GetTimestampSourceDescription(bool has_v4l2_timestamp,
+                                          bool has_rtcpu_offset) {
+  if (has_v4l2_timestamp) {
+    return has_rtcpu_offset ? "capture_time: v4l2 buf.timestamp -> rtcpu_to_realtime"
+                            : "capture_time: raw v4l2 buf.timestamp";
+  }
+  return "fallback_time: node current time now()";
 }
 
 } // namespace
@@ -276,6 +366,16 @@ void V4l2GpuCameraNode::InitializeCamera() {
     ThrowErrno("Failed to open V4L2 device");
   }
 
+  rtcpu_offset_ns_ = LoadRtcpuOffsetNs();
+  if (rtcpu_offset_ns_ >= 0) {
+    RCLCPP_INFO(get_logger(), "Using RTCPU timestamp offset: %lld ns",
+                static_cast<long long>(rtcpu_offset_ns_));
+  } else {
+    RCLCPP_WARN(get_logger(),
+                "Failed to load RTCPU offset, will fall back to raw V4L2 "
+                "timestamps when available");
+  }
+
   v4l2_capability cap{};
   if (ioctl(fd_, VIDIOC_QUERYCAP, &cap) < 0) {
     ThrowErrno("VIDIOC_QUERYCAP failed");
@@ -283,6 +383,13 @@ void V4l2GpuCameraNode::InitializeCamera() {
   if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
     throw std::runtime_error("V4L2 device does not support video capture");
   }
+
+  RCLCPP_INFO(
+      get_logger(),
+      "Timestamp source plan before capture: prefer V4L2 buffer timestamp; %s",
+      (rtcpu_offset_ns_ >= 0)
+          ? "convert capture timestamp to realtime using RTCPU offset"
+          : "if offset unavailable, use raw V4L2 timestamp directly");
 
   v4l2_format fmt{};
   fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -688,7 +795,6 @@ void V4l2GpuCameraNode::PublishFrame(void *cuda_ptr, int height,
               << GxfResultStr(output_timestamp.error());
     throw std::runtime_error(error_msg.str().c_str());
   }
-  constexpr uint64_t kNsPerSec = 1000000000ULL;
   output_timestamp.value()->acqtime =
       static_cast<uint64_t>(header.stamp.sec) * kNsPerSec +
       static_cast<uint64_t>(header.stamp.nanosec);
@@ -805,6 +911,7 @@ void V4l2GpuCameraNode::CaptureLoop() {
     }
 
     static std::atomic_bool logged_frame{false};
+    static std::atomic_bool logged_timestamp_source{false};
     if (!logged_frame.exchange(true)) {
       RCLCPP_INFO(get_logger(),
                   "V4L2 DMABUF frame: bytesused=%u sizeimage=%u field=%u "
@@ -816,6 +923,7 @@ void V4l2GpuCameraNode::CaptureLoop() {
     try {
       const size_t min_bytes = static_cast<size_t>(src_pitch_) * height_;
       int actual_height = height_;
+      rclcpp::Time capture_stamp = now();
       if (buf.bytesused > 0 && buf.bytesused < min_bytes) {
         actual_height = static_cast<int>(buf.bytesused / src_pitch_);
         if (actual_height <= 0) {
@@ -828,9 +936,42 @@ void V4l2GpuCameraNode::CaptureLoop() {
             buf.bytesused, min_bytes, height_, actual_height);
       }
 
+      if (buf.timestamp.tv_sec != 0 || buf.timestamp.tv_usec != 0) {
+        if (rtcpu_offset_ns_ >= 0) {
+          const timespec capture_time =
+              RtcpuToRealtime(buf.timestamp, rtcpu_offset_ns_);
+          capture_stamp = rclcpp::Time(
+              static_cast<int64_t>(capture_time.tv_sec) * kNsPerSec +
+                  static_cast<int64_t>(capture_time.tv_nsec),
+              RCL_SYSTEM_TIME);
+        } else {
+          capture_stamp = rclcpp::Time(
+              static_cast<int64_t>(buf.timestamp.tv_sec) * kNsPerSec +
+                  static_cast<int64_t>(buf.timestamp.tv_usec) * 1000LL,
+              RCL_SYSTEM_TIME);
+        }
+      }
+
+      if (!logged_timestamp_source.exchange(true)) {
+        const bool has_v4l2_timestamp =
+            (buf.timestamp.tv_sec != 0 || buf.timestamp.tv_usec != 0);
+        const rclcpp::Time now_stamp = now();
+        const int64_t delay_ns = now_stamp.nanoseconds() - capture_stamp.nanoseconds();
+        const double delay_ms = static_cast<double>(delay_ns) / 1000000.0;
+        RCLCPP_INFO(
+            get_logger(),
+            "Timestamp source on first frame: %s (buf.timestamp=%ld.%06ld, "
+            "rtcpu_offset_ns=%lld, capture_vs_now=%.3f ms)",
+            GetTimestampSourceDescription(has_v4l2_timestamp,
+                                          rtcpu_offset_ns_ >= 0),
+            static_cast<long>(buf.timestamp.tv_sec),
+            static_cast<long>(buf.timestamp.tv_usec),
+            static_cast<long long>(rtcpu_offset_ns_), delay_ms);
+      }
+
       void *cuda_ptr = ConvertDmaBufToOutputCuda(buf.index, actual_height,
                                                  static_cast<int>(buf.field));
-      PublishFrame(cuda_ptr, actual_height, now());
+      PublishFrame(cuda_ptr, actual_height, capture_stamp);
     } catch (const std::exception &ex) {
       RCLCPP_ERROR(get_logger(), "Capture error: %s", ex.what());
     }
@@ -847,4 +988,3 @@ void V4l2GpuCameraNode::CaptureLoop() {
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(
     nvidia::isaac_ros::v4l2_camera::V4l2GpuCameraNode)
-

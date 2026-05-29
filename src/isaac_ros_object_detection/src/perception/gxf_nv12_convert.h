@@ -37,6 +37,16 @@ cudaError_t ConvertGxfNV12ToBGR(void *bgr_gpu, const void *nv12_gpu, int width,
                                 int bgr_stride, cudaStream_t stream);
 
 /**
+ * @brief GXF NV12/NV21 直接转换为 BGR（GPU 到 GPU）
+ *
+ * @param swap_uv 0: NV12/UV, 非 0: NV21/VU
+ */
+cudaError_t ConvertGxfNV12ToBGREx(void *bgr_gpu, const void *nv12_gpu,
+                                  int width, int height, int y_stride,
+                                  int uv_stride, int bgr_stride, int swap_uv,
+                                  cudaStream_t stream);
+
+/**
  * @brief BGR 转换为 GXF NV12（GPU 到 GPU）
  *
  * @param nv12_gpu    输出：GXF NV12 GPU 缓冲区

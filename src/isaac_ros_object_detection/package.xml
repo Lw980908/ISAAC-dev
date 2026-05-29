@@ -16,7 +16,6 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>visualization_msgs</depend>
-  <depend>livox_ros_driver2</depend>
   <depend>cv_bridge</depend>
   <depend>vision_opencv</depend>  <!-- 正确的 OpenCV 依赖名 -->
   

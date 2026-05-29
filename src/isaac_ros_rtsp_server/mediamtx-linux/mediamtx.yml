@@ -23,14 +23,14 @@ readTimeout: 10s
 writeTimeout: 10s
 # Size of the queue of outgoing packets.
 # A higher value allows to increase throughput, a lower value allows to save RAM.
-writeQueueSize: 512
+writeQueueSize: 2048
 # Maximum size of outgoing UDP packets.
 # This can be decreased to avoid fragmentation on networks with a low UDP MTU.
 udpMaxPayloadSize: 1472
 # Size of the read buffer of every UDP socket.
 # This can be increased to decrease packet losses.
 # It defaults to the default value of the operating system.
-udpReadBufferSize: 0
+udpReadBufferSize: 4194304
 
 # Command to run when a client connects to the server.
 # This is terminated with SIGINT when a client disconnects from the server.
@@ -246,7 +246,7 @@ playbackTrustedProxies: []
 # Enable publishing and reading streams with the RTSP protocol.
 rtsp: no
 # Enabled RTSP transport protocols. The handshake is always performed with TCP.
-rtspTransports: [udp, multicast, tcp]
+rtspTransports: [tcp]
 # Use secure protocol variants (RTSPS, SRTP, SRTCP).
 # Available values are "no", "strict", "optional".
 rtspEncryption: "no"
@@ -767,40 +767,40 @@ pathDefaults:
 paths:
   camera0:
     source: rtsp://127.0.0.1:8554/camera0
-    sourceProtocol: tcp 
+    rtspTransport: tcp
     sourceOnDemand: yes 
-    sourceOnDemandCloseAfter: 5s 
+    sourceOnDemandCloseAfter: 30s 
 
   camera4:
     source: rtsp://127.0.0.1:8555/camera4
-    sourceProtocol: tcp
+    rtspTransport: tcp
     sourceOnDemand: yes
-    sourceOnDemandCloseAfter: 5s
+    sourceOnDemandCloseAfter: 30s
 
   camera5:
     source: rtsp://127.0.0.1:8556/camera5
-    sourceProtocol: tcp
+    rtspTransport: tcp
     sourceOnDemand: yes
-    sourceOnDemandCloseAfter: 5s
+    sourceOnDemandCloseAfter: 30s
 
   camera6:
     source: rtsp://127.0.0.1:8557/camera6
-    sourceProtocol: tcp
+    rtspTransport: tcp
     sourceOnDemand: yes
-    sourceOnDemandCloseAfter: 5s
+    sourceOnDemandCloseAfter: 30s
   
   camera7:
     source: rtsp://127.0.0.1:8558/camera7
-    sourceProtocol: tcp
+    rtspTransport: tcp
     sourceOnDemand: yes
-    sourceOnDemandCloseAfter: 5s
+    sourceOnDemandCloseAfter: 30s
   
   ipcam0:
     source: rtsp://admin:Aa550053721.@192.168.3.64:554/Streaming/Channels/101
     rtspTransport: tcp
     sourceOnDemand: yes
     sourceOnDemandStartTimeout: 30s
-    sourceOnDemandCloseAfter: 5s
+    sourceOnDemandCloseAfter: 30s
 
   # example:
   # my_camera:
@@ -809,4 +809,3 @@ paths:
   # Settings under path "all_others" are applied to all paths that
   # do not match another entry.
   all_others:
-

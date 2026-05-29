@@ -248,7 +248,6 @@ enum class ProcessMethod {
   MULTI_THREADS_MULTI_SOURCES,       // 多线程多输入源
   SINGLE_THREAD_SINGLE_SOURCE,       // 单线程单输入源
   SHARED_MODEL_THREAD_MULTI_SOURCES, // 共享模型多线程多输入源
-  CAMERA_COMBINED_WITH_LIDAR,        // 相机与雷达组合输入源
 };
 
 struct InputConfig {
@@ -295,7 +294,7 @@ struct InputConfig {
   int idx = 0;                                // 视频或图片索引
   static const int max_input_source_nums = 4; // 最大输入源数量
   bool is_input_init{false};                  // 输入源参数初始化标志
-  InputStream source{InputStream::VIDEO};     // 输入源类型
+  InputStream source{InputStream::CAMERA};     // 输入源类型
   ProcessMethod process_method{
       ProcessMethod::SHARED_MODEL_THREAD_MULTI_SOURCES}; // 处理方式
   bool ros2_enabled{false}; // 是否使用ros2订阅输入话题
